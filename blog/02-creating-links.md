@@ -252,6 +252,15 @@ The database confirmed the rows:
 
 The `expiring` column is `true` only for the link created with `expires_in_seconds`.
 
+The collision path was also forced with a temporary script that monkeypatched the slug generator:
+
+```text
+collision retry success: collision-ok after 2 attempts
+collision exhaustion: SlugGenerationError after 5 attempts
+```
+
+That confirms both branches: a collision is recoverable, and a broken generator cannot loop forever.
+
 ## Tradeoffs and what I would change in production
 
 The current design is correct for the spec, but there are deliberate limits:

@@ -154,6 +154,15 @@ Result:
  ZNqXDq6            | https://example.com/some/very/long/path | f
 ```
 
+Collision retry check:
+
+A temporary script monkeypatched the slug generator to force a collision on the first attempt, then return a unique slug. It also forced five consecutive collisions to verify the exhaustion path.
+
+```text
+collision retry success: collision-ok after 2 attempts
+collision exhaustion: SlugGenerationError after 5 attempts
+```
+
 Compilation check:
 
 ```bash
