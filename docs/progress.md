@@ -5,7 +5,8 @@ Last updated: 2026-11-20
 ## Current Status
 
 - **Milestone 1 complete:** scaffold, configuration, async database setup, `Link` model, startup table creation, and PostgreSQL-only `/health`.
-- **Next:** Milestone 2 — Base62 slug generation, validation schemas, and `POST /api/links`.
+- **Milestone 2 complete:** Base62 slug generation, request validation, custom aliases, collision retries, and `POST /api/links`.
+- **Next:** Milestone 3 — `GET /{slug}` redirects from PostgreSQL with `404` and `410` handling.
 
 Source of truth:
 
@@ -16,6 +17,7 @@ Source of truth:
 
 - `blog/README.md` — series index and planned posts.
 - `blog/01-scaffold-and-health.md` — Milestone 1 technical blog.
+- `blog/02-creating-links.md` — Milestone 2 technical blog.
 
 ## Completed Work
 
@@ -49,7 +51,21 @@ Created the project skeleton and core infrastructure:
 
 Commit: `17e7661 feat: scaffold app config database and health`
 
+### 3. Milestone 2 — create endpoint
+
+Added the first write path:
+
+- `app/services/base62.py` with the `0-9A-Za-z` alphabet and `secrets.choice` slug generation.
+- `app/schemas/link.py` with URL, alias, and expiry validation.
+- `app/services/link_service.py` with create/get logic, UTC helpers, response mapping, custom alias conflict handling, and five-attempt random slug retry.
+- `app/api/links.py` with `POST /api/links`.
+- `app/main.py` now registers the links router after the health router.
+
+Commit: `c31a64f feat: add link creation endpoint`
+
 ## Verification Performed
+
+### Infrastructure and Milestone 1
 
 Infrastructure:
 
@@ -106,6 +122,46 @@ Indexes:
     "ix_links_slug" UNIQUE, btree (slug)
 ```
 
+### Milestone 2
+
+Manual verification was run against the live application with a temporary Python client script.
+
+Result:
+
+```text
+random create: 201 slug=ZNqXDq6
+custom alias create: 201 slug=my-link-1795113812
+duplicate custom alias: 409
+reserved/invalid aliases: 422
+invalid URLs: 422
+expiring create: 201 expires_at=2026-11-19T18:44:32.539899Z
+```
+
+Database check:
+
+```bash
+docker compose exec -T postgres psql -U shortener -d shortener \
+  -c "SELECT slug, target_url, expires_at IS NOT NULL AS expiring FROM links ORDER BY id DESC LIMIT 5;"
+```
+
+Result:
+
+```text
+        slug        |               target_url                | expiring
+--------------------+-----------------------------------------+----------
+ 4WcKJ2r            | https://example.com/expiring            | t
+ my-link-1795113812 | https://example.com/alias               | f
+ ZNqXDq6            | https://example.com/some/very/long/path | f
+```
+
+Compilation check:
+
+```bash
+.venv/bin/python -m compileall -q app
+```
+
+Result: `COMPILE_OK`.
+
 ## Environment Notes
 
 - Native systemd services `postgresql@16-main` and `redis-server` were occupying `5432` and `6379`.
@@ -130,30 +186,7 @@ curl -i localhost:8000/health
 
 Expected: `200 {"postgres":"ok"}`.
 
-## Next Milestone
-
-### Milestone 2 — create endpoint
-
-Planned files:
-
-- `app/services/base62.py`
-- `app/schemas/link.py`
-- `app/services/link_service.py`
-- `app/api/links.py`
-- Modify `app/main.py`
-
-Planned behavior:
-
-- Random Base62 slug generation with `secrets.choice`.
-- URL validation: `http`/`https`, max 2048 characters.
-- Custom alias validation: 3–30 characters, `^[A-Za-z0-9_-]+$`, reserved-word rejection.
-- Expiry validation: 60 seconds to 31,536,000 seconds.
-- `POST /api/links` returns `201`.
-- Custom alias conflict returns `409 "Alias already in use"`.
-- Random slug collision retries up to 5 times, then returns `500 "Could not generate a unique slug"`.
-- Response shape: `slug`, `short_url`, `target_url`, `created_at`, `expires_at`.
-
-After implementation:
+Create a link:
 
 ```bash
 curl -i -X POST localhost:8000/api/links \
@@ -163,10 +196,35 @@ curl -i -X POST localhost:8000/api/links \
 
 Expected: `201` with a 7-character slug.
 
+## Next Milestone
+
+### Milestone 3 — redirect from PostgreSQL
+
+Planned files:
+
+- `app/api/redirect.py`
+- Modify `app/main.py`
+
+Planned behavior:
+
+- `GET /{slug}` looks up the slug in PostgreSQL.
+- Missing slug returns `404 {"detail":"Link not found"}`.
+- Expired link returns `410 {"detail":"Link has expired"}`.
+- Valid link returns `302` with `Location: <target_url>`.
+- The redirect router is registered after `/health` and `/api/*` so the catch-all does not shadow fixed routes.
+
+After implementation:
+
+```bash
+curl -i localhost:8000/<slug>
+```
+
+Expected: `302` with the correct `Location`.
+
 ## Pending Milestones
 
 - [x] Milestone 1 — scaffold and PostgreSQL health
-- [ ] Milestone 2 — create endpoint
+- [x] Milestone 2 — create endpoint
 - [ ] Milestone 3 — redirect from PostgreSQL
 - [ ] Milestone 4 — link info and delete
 - [ ] Milestone 5 — Redis cache-aside and full health check

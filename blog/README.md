@@ -7,7 +7,7 @@ Each post covers one milestone from `docs/plan.md`.
 ## Posts
 
 - [Milestone 1: Designing the Foundation](01-scaffold-and-health.md) — FastAPI, async SQLAlchemy, PostgreSQL, the Redis boundary, configuration, lifespan, and health checks.
-- Milestone 2: Creating Links — Base62 slugs, validation, custom aliases, and collision retries. Planned.
+- [Milestone 2: Creating Links Without Racing Yourself](02-creating-links.md) — Base62 slugs, validation, custom aliases, and database-enforced collision handling.
 - Milestone 3: Redirects — cache-free redirects, expiry semantics, and HTTP status codes. Planned.
 - Milestone 4: Link Lifecycle — reading metadata and deleting links safely. Planned.
 - Milestone 5: Redis Cache-Aside — TTLs, invalidation, and graceful degradation. Planned.
