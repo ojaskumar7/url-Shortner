@@ -98,3 +98,13 @@ async def get_link(session: AsyncSession, slug: str) -> Link | None:
     """Look up a link by slug in PostgreSQL."""
     result = await session.execute(select(Link).where(Link.slug == slug))
     return result.scalar_one_or_none()
+
+
+async def delete_link(session: AsyncSession, slug: str) -> bool:
+    """Delete a link by slug. Return whether a row was deleted."""
+    link = await get_link(session, slug)
+    if link is None:
+        return False
+    await session.delete(link)
+    await session.commit()
+    return True

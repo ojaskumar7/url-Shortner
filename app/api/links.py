@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
@@ -21,3 +21,29 @@ async def create_link(
     except link_service.SlugGenerationError:
         raise HTTPException(status_code=500, detail="Could not generate a unique slug")
     return link_service.link_to_response(link)
+
+
+@router.get("/{slug}", response_model=LinkResponse)
+async def get_link_info(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+) -> LinkResponse:
+    """Return metadata for a short link."""
+    link = await link_service.get_link(session, slug)
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    if link_service.is_expired(link):
+        raise HTTPException(status_code=410, detail="Link has expired")
+    return link_service.link_to_response(link)
+
+
+@router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_link(
+    slug: str,
+    session: AsyncSession = Depends(get_session),
+) -> Response:
+    """Delete a short link."""
+    deleted = await link_service.delete_link(session, slug)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
