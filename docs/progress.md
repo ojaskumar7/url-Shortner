@@ -12,6 +12,11 @@ Source of truth:
 - `SPEC.md` — approved specification.
 - `docs/plan.md` — full implementation plan with milestones, file map, verification steps, and commit points.
 
+## Blog Series
+
+- `blog/README.md` — series index and planned posts.
+- `blog/01-scaffold-and-health.md` — Milestone 1 technical blog.
+
 ## Completed Work
 
 ### 1. Implementation plan
