@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import health
+from app.api import health, links
 from app.core.database import Base, engine
 from app.models import link  # noqa: F401  (registers the Link model)
 
@@ -30,3 +30,4 @@ app = FastAPI(title="URL Shortener", lifespan=lifespan)
 
 # Register fixed paths before the /{slug} catch-all added later.
 app.include_router(health.router)
+app.include_router(links.router)
