@@ -1,6 +1,6 @@
 # URL Shortener Implementation Plan
 
-> **Progress:** Tasks 0 through 2 are complete as of 2026-11-20. See `docs/progress.md` for verified results, commits, and environment notes. The checkboxes below remain the original execution checklist.
+> **Progress:** Tasks 0 through 3 are complete as of 2026-11-20. See `docs/progress.md` for verified results, commits, and environment notes. The checkboxes below remain the original execution checklist.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -6,7 +6,8 @@ Last updated: 2026-11-20
 
 - **Milestone 1 complete:** scaffold, configuration, async database setup, `Link` model, startup table creation, and PostgreSQL-only `/health`.
 - **Milestone 2 complete:** Base62 slug generation, request validation, custom aliases, collision retries, and `POST /api/links`.
-- **Next:** Milestone 3 — `GET /{slug}` redirects from PostgreSQL with `404` and `410` handling.
+- **Milestone 3 complete:** `GET /{slug}` redirects from PostgreSQL with `302`, `404`, and `410` handling.
+- **Next:** Milestone 4 — `GET /api/links/{slug}` and `DELETE /api/links/{slug}`.
 
 Source of truth:
 
@@ -18,6 +19,7 @@ Source of truth:
 - `blog/README.md` — series index and planned posts.
 - `blog/01-scaffold-and-health.md` — Milestone 1 technical blog.
 - `blog/02-creating-links.md` — Milestone 2 technical blog.
+- `blog/03-redirects.md` — Milestone 3 technical blog.
 
 ## Completed Work
 
@@ -62,6 +64,19 @@ Added the first write path:
 - `app/main.py` now registers the links router after the health router.
 
 Commit: `c31a64f feat: add link creation endpoint`
+
+### 4. Milestone 3 — redirect endpoint
+
+Added the read path:
+
+- `app/api/redirect.py` with `GET /{slug}`.
+- `app/main.py` now registers the redirect router last, after the health and links routers.
+- Valid links return `302` with the target URL in `Location`.
+- Missing slugs return `404 {"detail":"Link not found"}`.
+- Expired links return `410 {"detail":"Link has expired"}`.
+- Expiry is checked against timezone-aware UTC datetimes.
+
+Commit: `270a2cb feat: add redirect endpoint`
 
 ## Verification Performed
 
@@ -171,6 +186,36 @@ Compilation check:
 
 Result: `COMPILE_OK`.
 
+### Milestone 3
+
+A temporary HTTP client script verified the redirect path against the running application.
+
+```text
+redirect: 302 Location=https://example.com/redirect-target
+unknown slug: 404 Link not found
+expired slug: 410 Link has expired
+route ordering: /health still returns 200
+```
+
+Server log confirmation:
+
+```text
+"GET /YWDdxLg HTTP/1.1" 302 Found
+"GET /does-not-exist HTTP/1.1" 404 Not Found
+"GET /expired-1795114092 HTTP/1.1" 410 Gone
+"GET /health HTTP/1.1" 200 OK
+```
+
+The expired-link check inserted a row with `expires_at` in the past, then requested it through the public route. Temporary verification rows were removed afterward.
+
+Compilation check:
+
+```bash
+.venv/bin/python -m compileall -q app
+```
+
+Result: `COMPILE_OK`.
+
 ## Environment Notes
 
 - Native systemd services `postgresql@16-main` and `redis-server` were occupying `5432` and `6379`.
@@ -205,36 +250,35 @@ curl -i -X POST localhost:8000/api/links \
 
 Expected: `201` with a 7-character slug.
 
-## Next Milestone
-
-### Milestone 3 — redirect from PostgreSQL
-
-Planned files:
-
-- `app/api/redirect.py`
-- Modify `app/main.py`
-
-Planned behavior:
-
-- `GET /{slug}` looks up the slug in PostgreSQL.
-- Missing slug returns `404 {"detail":"Link not found"}`.
-- Expired link returns `410 {"detail":"Link has expired"}`.
-- Valid link returns `302` with `Location: <target_url>`.
-- The redirect router is registered after `/health` and `/api/*` so the catch-all does not shadow fixed routes.
-
-After implementation:
+Follow the redirect:
 
 ```bash
 curl -i localhost:8000/<slug>
 ```
 
-Expected: `302` with the correct `Location`.
+Expected: `302` with `Location: <target_url>`.
+
+## Next Milestone
+
+### Milestone 4 — link info and delete
+
+Planned files:
+
+- Modify `app/services/link_service.py`
+- Modify `app/api/links.py`
+
+Planned behavior:
+
+- `GET /api/links/{slug}` returns the same response shape as create.
+- Missing slug returns `404`; expired link returns `410`.
+- `DELETE /api/links/{slug}` removes the row and returns `204`.
+- Deleting a missing slug returns `404`.
 
 ## Pending Milestones
 
 - [x] Milestone 1 — scaffold and PostgreSQL health
 - [x] Milestone 2 — create endpoint
-- [ ] Milestone 3 — redirect from PostgreSQL
+- [x] Milestone 3 — redirect from PostgreSQL
 - [ ] Milestone 4 — link info and delete
 - [ ] Milestone 5 — Redis cache-aside and full health check
 - [ ] Milestone 6 — README and final acceptance review
