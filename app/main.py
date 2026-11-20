@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.api import health, links, redirect
 from app.core.database import Base, engine
+from app.core.redis import create_redis_client
 from app.models import link  # noqa: F401  (registers the Link model)
 
 logging.basicConfig(
@@ -16,13 +17,15 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create tables and release database resources on shutdown."""
+    """Create tables, initialize Redis, and release resources on shutdown."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables ready")
+    app.state.redis = create_redis_client()
     try:
         yield
     finally:
+        await app.state.redis.aclose()
         await engine.dispose()
 
 

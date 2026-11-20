@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.redis import get_redis
 from app.schemas.link import LinkCreate, LinkResponse
-from app.services import link_service
+from app.services import cache, link_service
 
 router = APIRouter(prefix="/api/links", tags=["links"])
 
@@ -41,9 +43,11 @@ async def get_link_info(
 async def delete_link(
     slug: str,
     session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis),
 ) -> Response:
-    """Delete a short link."""
+    """Delete a short link and invalidate its cache entry."""
     deleted = await link_service.delete_link(session, slug)
     if not deleted:
         raise HTTPException(status_code=404, detail="Link not found")
+    await cache.delete_cached_target(redis, slug)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
