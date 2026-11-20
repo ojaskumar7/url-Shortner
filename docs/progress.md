@@ -9,7 +9,8 @@ Last updated: 2026-11-20
 - **Milestone 3 complete:** `GET /{slug}` redirects from PostgreSQL with `302`, `404`, and `410` handling.
 - **Milestone 4 complete:** `GET /api/links/{slug}` returns metadata, and `DELETE /api/links/{slug}` removes links with `204` or `404`.
 - **Milestone 5 complete:** Redis cache-aside redirects, delete invalidation, TTLs, and a PostgreSQL + Redis `/health`.
-- **Next:** Milestone 6 — README and final acceptance review.
+- **Milestone 6 complete:** README, full acceptance checklist, final scope review, and the closing blog post.
+- **Status:** complete against `SPEC.md`.
 
 Source of truth:
 
@@ -24,6 +25,7 @@ Source of truth:
 - `blog/03-redirects.md` — Milestone 3 technical blog.
 - `blog/04-link-lifecycle.md` — Milestone 4 technical blog.
 - `blog/05-redis-cache-aside.md` — Milestone 5 technical blog.
+- `blog/06-polish-and-review.md` — Milestone 6 technical blog.
 
 ## Completed Work
 
@@ -106,6 +108,19 @@ Added the cache layer:
 - `app/api/health.py` checks PostgreSQL and Redis independently and returns `503` when either dependency is down.
 
 Commit: `46d00a2 feat: add redis cache-aside and full health check`
+
+### 7. Milestone 6 — README and final acceptance
+
+Finished the project:
+
+- Added `README.md` with setup, configuration, API examples, design decisions, scope, and the blog series index.
+- Ran the full manual acceptance checklist from `SPEC.md` section 12 against the live application.
+- Confirmed the schema has a unique index on `slug`.
+- Confirmed no auth, rate limiting, analytics, Alembic, negative caching, automated tests, or app Dockerfile were added.
+- Confirmed configuration stays in `Settings`, all request-path I/O is async, datetimes are timezone-aware UTC, errors use `{"detail": "..."}`, and `/health` plus `/api/*` are registered before `/{slug}`.
+- Added the closing blog post and updated the series index.
+
+Commit: `docs: add README and finalize project`
 
 ## Verification Performed
 
@@ -325,10 +340,58 @@ Compilation check:
 
 Result: `COMPILE_OK`.
 
+### Milestone 6
+
+The full `SPEC.md` section 12 acceptance checklist was run against the live application.
+
+```text
+1. health: 200 postgres=ok redis=ok
+2. create: 201 slug=RkEHVEE
+3. redirect: 302 with correct Location
+4. cache hit: 302 after direct DB deletion (ttl=86400)
+5. custom alias: 201 then duplicate 409 (acc-1795151556)
+6. reserved and invalid aliases: 422
+7. invalid URLs: 422
+8. expiry: redirect 302, ttl=59; waiting 61s
+8. expiry: Redis key gone, redirect/info 410
+9. info: 200 and unknown 404
+10. delete: 204, cache cleared, redirect 404, repeat 404
+11. Redis down: redirect 302 via Postgres, health 503
+ACCEPTANCE_OK
+```
+
+Schema check:
+
+```text
+Indexes:
+    "links_pkey" PRIMARY KEY, btree (id)
+    "ix_links_slug" UNIQUE, btree (slug)
+```
+
+Final review checks:
+
+- `requirements.txt` contains only the six specified dependencies.
+- No `Dockerfile`, Alembic directory, or test suite exists.
+- `.env` is ignored by `.gitignore`; `.env.example` is tracked.
+- No hardcoded app configuration exists outside `Settings`.
+- No synchronous HTTP or database calls exist in the request path.
+- `utc_now()` uses `datetime.now(timezone.utc)` and timestamp columns use `DateTime(timezone=True)`.
+- API errors use FastAPI `HTTPException`, producing `{"detail": "..."}`.
+- `app/main.py` registers `health`, `links`, then the redirect catch-all.
+- Redis failure fallback and `503` health behavior were verified live.
+
+Compilation check:
+
+```bash
+.venv/bin/python -m compileall -q app
+```
+
+Result: `COMPILE_OK`.
+
 ## Environment Notes
 
 - Native systemd services `postgresql@16-main` and `redis-server` are active again and occupy `5432` and `6379`.
-- The Docker Compose containers were started with a temporary override on `5433`/`6380` for Milestones 4 and 5 verification. The override lives in `/tmp/opencode/docker-compose.override.yml` and is not part of the repository.
+- The Docker Compose containers were started with a temporary override on `5433`/`6380` for Milestones 4, 5, and 6 verification. The override lives in `/tmp/opencode/docker-compose.override.yml` and is not part of the repository.
 - Milestone 5 verification stopped and restarted the Redis container to confirm that redirects degrade to PostgreSQL and `/health` reports `503`.
 - The local `.env` points to the standard ports. `.env` is gitignored and is not committed.
 - To use the standard ports again, stop the native services (requires sudo) and run `docker compose up -d`.
@@ -386,20 +449,12 @@ curl -i -X DELETE localhost:8000/api/links/<slug>
 
 Expected: `204` with an empty body. A subsequent redirect or info request returns `404`.
 
-## Next Milestone
+## Final State
 
-### Milestone 6 — README and final acceptance review
-
-Planned files:
-
-- Create `README.md`
-- Modify `docs/plan.md` (final status)
-
-Planned behavior:
-
-- Document setup, curl examples, and design decisions.
-- Run the full acceptance checklist from `SPEC.md`.
-- Confirm no out-of-scope features were added.
+- All six milestones are complete.
+- `README.md` documents setup, API usage, and design decisions.
+- The full `SPEC.md` acceptance checklist passes.
+- The blog series is complete through Milestone 6.
 
 ## Pending Milestones
 
@@ -408,4 +463,4 @@ Planned behavior:
 - [x] Milestone 3 — redirect from PostgreSQL
 - [x] Milestone 4 — link info and delete
 - [x] Milestone 5 — Redis cache-aside and full health check
-- [ ] Milestone 6 — README and final acceptance review
+- [x] Milestone 6 — README and final acceptance review

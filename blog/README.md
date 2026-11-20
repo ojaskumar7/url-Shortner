@@ -11,7 +11,7 @@ Each post covers one milestone from `docs/plan.md`.
 - [Milestone 3: Redirects, Status Codes, and the Cost of Being Wrong](03-redirects.md) — 302 semantics, 404 versus 410, route ordering, and the uncached read path.
 - [Milestone 4: Link Lifecycle](04-link-lifecycle.md) — reading metadata, hard deletion, 204 versus 404, and the cache invalidation problem ahead.
 - [Milestone 5: Redis Cache-Aside](05-redis-cache-aside.md) — cache-aside flow, TTLs, invalidation, the stale-cache race, and failing open.
-- Milestone 6: Polish and Review — README, acceptance checks, and design retrospective. Planned.
+- [Milestone 6: README, Acceptance Checks, and the Final Review](06-polish-and-review.md) — the full acceptance pass, final review, and production retrospective.
 
 ## Ground Rules
 

@@ -1,8 +1,8 @@
 # URL Shortener Implementation Plan
 
-> **Progress:** Tasks 0 through 5 are complete as of 2026-11-20. See `docs/progress.md` for verified results, commits, and environment notes. The checkboxes below remain the original execution checklist.
+> **Progress:** Tasks 0 through 6 are complete as of 2026-11-20. See `docs/progress.md` for verified results, commits, and environment notes. The checklist below is fully checked.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a small FastAPI URL shortener backed by PostgreSQL and Redis, with random Base62 slugs, custom aliases, expiry, cache-aside redirects, and consistent errors.
 
@@ -56,7 +56,7 @@
 - Create: `docs/plan.md`
 - Create: `.gitignore`
 
-- [ ] **Step 1: Create `.gitignore`**
+- [x] **Step 1: Create `.gitignore`**
 
 ```gitignore
 .venv/
@@ -67,7 +67,7 @@ __pycache__/
 .DS_Store
 ```
 
-- [ ] **Step 2: Commit only the plan and ignore file**
+- [x] **Step 2: Commit only the plan and ignore file**
 
 ```bash
 git add docs/plan.md .gitignore
@@ -103,7 +103,7 @@ Expected: commit succeeds; `.venv/` is not staged.
 - Produces: `Link` ORM model with `id`, `slug`, `target_url`, `created_at`, `expires_at`.
 - Produces: `GET /health` returning PostgreSQL status.
 
-- [ ] **Step 1: Create dependency and environment files**
+- [x] **Step 1: Create dependency and environment files**
 
 `requirements.txt`:
 
@@ -152,11 +152,11 @@ volumes:
 
 `SPEC.md`: save the approved specification from the task prompt verbatim.
 
-- [ ] **Step 2: Create empty package markers**
+- [x] **Step 2: Create empty package markers**
 
 Create empty `__init__.py` files in `app/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, and `app/api/`.
 
-- [ ] **Step 3: Implement `app/core/config.py`**
+- [x] **Step 3: Implement `app/core/config.py`**
 
 ```python
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -181,7 +181,7 @@ class Settings(BaseSettings):
 settings = Settings()
 ```
 
-- [ ] **Step 4: Implement `app/core/database.py`**
+- [x] **Step 4: Implement `app/core/database.py`**
 
 ```python
 from collections.abc import AsyncGenerator
@@ -210,7 +210,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 ```
 
-- [ ] **Step 5: Implement `app/models/link.py`**
+- [x] **Step 5: Implement `app/models/link.py`**
 
 ```python
 from datetime import datetime
@@ -245,7 +245,7 @@ class Link(Base):
     )
 ```
 
-- [ ] **Step 6: Implement PostgreSQL-only `app/api/health.py`**
+- [x] **Step 6: Implement PostgreSQL-only `app/api/health.py`**
 
 ```python
 from fastapi import APIRouter, Depends
@@ -264,7 +264,7 @@ async def health(session: AsyncSession = Depends(get_session)) -> dict[str, str]
     return {"postgres": "ok"}
 ```
 
-- [ ] **Step 7: Implement `app/main.py` with lifespan and route order**
+- [x] **Step 7: Implement `app/main.py` with lifespan and route order**
 
 ```python
 import logging
@@ -301,7 +301,7 @@ app = FastAPI(title="URL Shortener", lifespan=lifespan)
 app.include_router(health.router)
 ```
 
-- [ ] **Step 8: Install dependencies and start infrastructure**
+- [x] **Step 8: Install dependencies and start infrastructure**
 
 ```bash
 python -m venv .venv
@@ -313,7 +313,7 @@ docker compose up -d
 
 Expected: PostgreSQL and Redis containers are running.
 
-- [ ] **Step 9: Run the app and verify PostgreSQL health**
+- [x] **Step 9: Run the app and verify PostgreSQL health**
 
 ```bash
 uvicorn app.main:app --reload
@@ -327,7 +327,7 @@ curl -i localhost:8000/health
 
 Expected: HTTP 200 and `{"postgres":"ok"}`.
 
-- [ ] **Step 10: Verify the schema**
+- [x] **Step 10: Verify the schema**
 
 ```bash
 docker compose exec postgres psql -U shortener -d shortener -c '\d links'
@@ -335,7 +335,7 @@ docker compose exec postgres psql -U shortener -d shortener -c '\d links'
 
 Expected: `links` table with a unique index on `slug`.
 
-- [ ] **Step 11: Commit milestone 1**
+- [x] **Step 11: Commit milestone 1**
 
 ```bash
 git add requirements.txt .env.example docker-compose.yml SPEC.md app
@@ -360,7 +360,7 @@ git commit -m "feat: scaffold app config database and health"
 - Produces: `create_link(session, payload) -> Link`, `get_link(session, slug) -> Link | None`, `is_expired(link) -> bool`, `link_to_response(link) -> LinkResponse`, `AliasConflictError`, `SlugGenerationError`.
 - Produces: `POST /api/links` returning 201.
 
-- [ ] **Step 1: Implement `app/services/base62.py`**
+- [x] **Step 1: Implement `app/services/base62.py`**
 
 ```python
 import secrets
@@ -374,7 +374,7 @@ def generate_slug(length: int = 7) -> str:
     return "".join(secrets.choice(ALPHABET) for _ in range(length))
 ```
 
-- [ ] **Step 2: Implement `app/schemas/link.py`**
+- [x] **Step 2: Implement `app/schemas/link.py`**
 
 ```python
 import re
@@ -436,7 +436,7 @@ class LinkResponse(BaseModel):
     expires_at: datetime | None
 ```
 
-- [ ] **Step 3: Implement `app/services/link_service.py`**
+- [x] **Step 3: Implement `app/services/link_service.py`**
 
 ```python
 import logging
@@ -541,7 +541,7 @@ async def get_link(session: AsyncSession, slug: str) -> Link | None:
     return result.scalar_one_or_none()
 ```
 
-- [ ] **Step 4: Implement `app/api/links.py` with the create route**
+- [x] **Step 4: Implement `app/api/links.py` with the create route**
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -569,7 +569,7 @@ async def create_link(
     return link_service.link_to_response(link)
 ```
 
-- [ ] **Step 5: Register the links router in `app/main.py`**
+- [x] **Step 5: Register the links router in `app/main.py`**
 
 Add:
 
@@ -583,7 +583,7 @@ and after the health router:
 app.include_router(links.router)
 ```
 
-- [ ] **Step 6: Verify creation and validation**
+- [x] **Step 6: Verify creation and validation**
 
 ```bash
 curl -i -X POST localhost:8000/api/links \
@@ -617,7 +617,7 @@ curl -i -X POST localhost:8000/api/links \
 
 Expected: 422 invalid URL.
 
-- [ ] **Step 7: Commit milestone 2**
+- [x] **Step 7: Commit milestone 2**
 
 ```bash
 git add app/services/base62.py app/schemas/link.py app/services/link_service.py app/api/links.py app/main.py
@@ -636,7 +636,7 @@ git commit -m "feat: add link creation endpoint"
 - Consumes: `get_link`, `is_expired`, `get_session`.
 - Produces: `GET /{slug}` returning 302, 404, or 410.
 
-- [ ] **Step 1: Implement `app/api/redirect.py`**
+- [x] **Step 1: Implement `app/api/redirect.py`**
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException
@@ -663,7 +663,7 @@ async def redirect_to_target(
     return RedirectResponse(url=link.target_url, status_code=302)
 ```
 
-- [ ] **Step 2: Register the redirect router last in `app/main.py`**
+- [x] **Step 2: Register the redirect router last in `app/main.py`**
 
 Add `redirect` to the import:
 
@@ -678,7 +678,7 @@ Then after the links router:
 app.include_router(redirect.router)
 ```
 
-- [ ] **Step 3: Verify redirect behavior**
+- [x] **Step 3: Verify redirect behavior**
 
 Create a link, copy its slug, then:
 
@@ -698,7 +698,7 @@ Create a link with `"expires_in_seconds":60`, wait 60 seconds, then request it.
 
 Expected: HTTP 410 `{"detail":"Link has expired"}`.
 
-- [ ] **Step 4: Commit milestone 3**
+- [x] **Step 4: Commit milestone 3**
 
 ```bash
 git add app/api/redirect.py app/main.py
@@ -717,7 +717,7 @@ git commit -m "feat: add redirect endpoint"
 - Produces: `delete_link(session, slug) -> bool`.
 - Produces: `GET /api/links/{slug}` and `DELETE /api/links/{slug}`.
 
-- [ ] **Step 1: Add `delete_link` to `app/services/link_service.py`**
+- [x] **Step 1: Add `delete_link` to `app/services/link_service.py`**
 
 ```python
 async def delete_link(session: AsyncSession, slug: str) -> bool:
@@ -730,7 +730,7 @@ async def delete_link(session: AsyncSession, slug: str) -> bool:
     return True
 ```
 
-- [ ] **Step 2: Add info and delete routes to `app/api/links.py`**
+- [x] **Step 2: Add info and delete routes to `app/api/links.py`**
 
 ```python
 @router.get("/{slug}", response_model=LinkResponse)
@@ -765,7 +765,7 @@ Add `Response` to the FastAPI imports in that file:
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 ```
 
-- [ ] **Step 3: Verify info and deletion**
+- [x] **Step 3: Verify info and deletion**
 
 ```bash
 curl -i localhost:8000/api/links/<slug>
@@ -785,7 +785,7 @@ curl -i -X DELETE localhost:8000/api/links/<slug>
 
 Expected: 204 with an empty body. A subsequent redirect or info request returns 404.
 
-- [ ] **Step 4: Commit milestone 4**
+- [x] **Step 4: Commit milestone 4**
 
 ```bash
 git add app/services/link_service.py app/api/links.py
@@ -810,7 +810,7 @@ git commit -m "feat: add link info and delete endpoints"
 - Produces: `get_cached_target`, `set_cached_target`, `delete_cached_target`.
 - Produces: cache-aside redirect and full `/health`.
 
-- [ ] **Step 1: Implement `app/core/redis.py`**
+- [x] **Step 1: Implement `app/core/redis.py`**
 
 ```python
 from fastapi import Request
@@ -829,7 +829,7 @@ def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 ```
 
-- [ ] **Step 2: Implement `app/services/cache.py`**
+- [x] **Step 2: Implement `app/services/cache.py`**
 
 ```python
 import logging
@@ -874,7 +874,7 @@ async def delete_cached_target(redis: Redis, slug: str) -> None:
         logger.warning("Redis DEL failed for %s", cache_key(slug), exc_info=True)
 ```
 
-- [ ] **Step 3: Initialize and close Redis in the `app/main.py` lifespan**
+- [x] **Step 3: Initialize and close Redis in the `app/main.py` lifespan**
 
 ```python
 from app.core.redis import create_redis_client
@@ -887,7 +887,7 @@ await app.state.redis.aclose()
 await engine.dispose()
 ```
 
-- [ ] **Step 4: Add cache-aside behavior to `app/api/redirect.py`**
+- [x] **Step 4: Add cache-aside behavior to `app/api/redirect.py`**
 
 ```python
 from redis.asyncio import Redis
@@ -922,7 +922,7 @@ async def redirect_to_target(
     return RedirectResponse(url=link.target_url, status_code=302)
 ```
 
-- [ ] **Step 5: Invalidate Redis on delete**
+- [x] **Step 5: Invalidate Redis on delete**
 
 Add the Redis dependency to the delete route in `app/api/links.py`:
 
@@ -947,7 +947,7 @@ async def delete_link(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 ```
 
-- [ ] **Step 6: Replace `app/api/health.py` with the full health check**
+- [x] **Step 6: Replace `app/api/health.py` with the full health check**
 
 ```python
 import logging
@@ -989,7 +989,7 @@ async def health(
     return JSONResponse(status_code=status_code, content=statuses)
 ```
 
-- [ ] **Step 7: Verify cache behavior**
+- [x] **Step 7: Verify cache behavior**
 
 ```bash
 curl -i localhost:8000/<slug>
@@ -1004,13 +1004,13 @@ curl -i localhost:8000/<slug>
 
 Expected: 302, served from Redis. The app log should not show a PostgreSQL lookup for this second request.
 
-- [ ] **Step 8: Verify expiry removes the cache entry**
+- [x] **Step 8: Verify expiry removes the cache entry**
 
 Create a link with `"expires_in_seconds":60`, request it immediately, wait 60 seconds, then request again.
 
 Expected: 410, and `redis-cli GET link:<slug>` is empty.
 
-- [ ] **Step 9: Verify delete invalidates the cache**
+- [x] **Step 9: Verify delete invalidates the cache**
 
 Create a link, request it once, then delete it.
 
@@ -1022,7 +1022,7 @@ redis-cli GET link:<slug>
 
 Expected: 204, then 404, and an empty Redis value.
 
-- [ ] **Step 10: Verify graceful Redis failure**
+- [x] **Step 10: Verify graceful Redis failure**
 
 ```bash
 docker compose stop redis
@@ -1038,7 +1038,7 @@ Restart Redis:
 docker compose start redis
 ```
 
-- [ ] **Step 11: Commit milestone 5**
+- [x] **Step 11: Commit milestone 5**
 
 ```bash
 git add app/core/redis.py app/services/cache.py app/main.py app/api/redirect.py app/api/links.py app/api/health.py
@@ -1053,7 +1053,7 @@ git commit -m "feat: add redis cache-aside and full health check"
 - Create: `README.md`
 - Modify: `docs/plan.md` (check off completed items)
 
-- [ ] **Step 1: Write `README.md`**
+- [x] **Step 1: Write `README.md`**
 
 Include:
 
@@ -1080,11 +1080,11 @@ uvicorn app.main:app --reload
   - Redis failures degrade gracefully.
   - Route ordering prevents `/api/*` and `/health` from being shadowed.
 
-- [ ] **Step 2: Run the full acceptance checklist**
+- [x] **Step 2: Run the full acceptance checklist**
 
 Use the checklist from section 12 of `SPEC.md`. Record any failures and fix them before committing.
 
-- [ ] **Step 3: Final review**
+- [x] **Step 3: Final review**
 
 Confirm:
 
@@ -1097,7 +1097,7 @@ Confirm:
 - Redis failure does not break redirects.
 - `.env` is ignored and `.env.example` is committed.
 
-- [ ] **Step 4: Commit milestone 6**
+- [x] **Step 4: Commit milestone 6**
 
 ```bash
 git add README.md docs/plan.md
@@ -1108,17 +1108,17 @@ git commit -m "docs: add README and finalize project"
 
 ## Manual Acceptance Checklist
 
-- [ ] `docker compose up -d` starts PostgreSQL 16 and Redis 7.
-- [ ] `GET /health` returns 200 with `{"postgres":"ok","redis":"ok"}`.
-- [ ] `POST /api/links` with a plain URL returns 201 and a 7-character slug.
-- [ ] `GET /{slug}` returns 302 with the correct `Location`.
-- [ ] A second redirect is served from Redis.
-- [ ] Custom alias creation works; a duplicate returns 409.
-- [ ] Reserved alias returns 422.
-- [ ] Invalid alias characters or length return 422.
-- [ ] Invalid URL (`ftp://`, plain text, over 2048 chars) returns 422.
-- [ ] Expiring links return 410 after expiry and the Redis key is gone.
-- [ ] `GET /api/links/{slug}` returns link info; unknown slug returns 404.
-- [ ] `DELETE /api/links/{slug}` returns 204 and invalidates the cache.
-- [ ] Stopping Redis leaves redirects working; `/health` returns 503 with `"redis":"error"`.
-- [ ] `\d links` in `psql` shows the unique index on `slug`.
+- [x] `docker compose up -d` starts PostgreSQL 16 and Redis 7.
+- [x] `GET /health` returns 200 with `{"postgres":"ok","redis":"ok"}`.
+- [x] `POST /api/links` with a plain URL returns 201 and a 7-character slug.
+- [x] `GET /{slug}` returns 302 with the correct `Location`.
+- [x] A second redirect is served from Redis.
+- [x] Custom alias creation works; a duplicate returns 409.
+- [x] Reserved alias returns 422.
+- [x] Invalid alias characters or length return 422.
+- [x] Invalid URL (`ftp://`, plain text, over 2048 chars) returns 422.
+- [x] Expiring links return 410 after expiry and the Redis key is gone.
+- [x] `GET /api/links/{slug}` returns link info; unknown slug returns 404.
+- [x] `DELETE /api/links/{slug}` returns 204 and invalidates the cache.
+- [x] Stopping Redis leaves redirects working; `/health` returns 503 with `"redis":"error"`.
+- [x] `\d links` in `psql` shows the unique index on `slug`.
