@@ -89,6 +89,25 @@ DEFAULT_CACHE_TTL_SECONDS=86400
 
 ## API
 
+All error responses use FastAPI's default shape: `{"detail": "..."}`.
+
+### Status codes
+
+| Code | Meaning | Used by |
+|---|---|---|
+| `200 OK` | Request succeeded | `GET /api/links/{slug}`, healthy `GET /health` |
+| `201 Created` | Link created | `POST /api/links` |
+| `204 No Content` | Deleted successfully; empty body | `DELETE /api/links/{slug}` |
+| `302 Found` | Temporary redirect | `GET /{slug}` |
+| `404 Not Found` | No resource at this URL | Missing link, unknown info slug, missing delete target |
+| `409 Conflict` | Request conflicts with current state | Duplicate `custom_alias` |
+| `410 Gone` | Link existed but is no longer available | Expired redirect or info request |
+| `422 Unprocessable Entity` | Request validation failed | Invalid URL, alias, or expiry |
+| `500 Internal Server Error` | Unexpected server failure | Slug generation exhausted after 5 collisions |
+| `503 Service Unavailable` | Dependency unhealthy | `/health` when PostgreSQL or Redis fails |
+
+The important distinction is `404` versus `410`: `404` means there is no resource at that location; `410` means the resource existed but has expired.
+
 ### Health
 
 ```bash
