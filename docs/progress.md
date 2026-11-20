@@ -7,7 +7,8 @@ Last updated: 2026-11-20
 - **Milestone 1 complete:** scaffold, configuration, async database setup, `Link` model, startup table creation, and PostgreSQL-only `/health`.
 - **Milestone 2 complete:** Base62 slug generation, request validation, custom aliases, collision retries, and `POST /api/links`.
 - **Milestone 3 complete:** `GET /{slug}` redirects from PostgreSQL with `302`, `404`, and `410` handling.
-- **Next:** Milestone 4 — `GET /api/links/{slug}` and `DELETE /api/links/{slug}`.
+- **Milestone 4 complete:** `GET /api/links/{slug}` returns metadata, and `DELETE /api/links/{slug}` removes links with `204` or `404`.
+- **Next:** Milestone 5 — Redis cache-aside, cache invalidation on delete, and full `/health`.
 
 Source of truth:
 
@@ -20,6 +21,7 @@ Source of truth:
 - `blog/01-scaffold-and-health.md` — Milestone 1 technical blog.
 - `blog/02-creating-links.md` — Milestone 2 technical blog.
 - `blog/03-redirects.md` — Milestone 3 technical blog.
+- `blog/04-link-lifecycle.md` — Milestone 4 technical blog.
 
 ## Completed Work
 
@@ -77,6 +79,18 @@ Added the read path:
 - Expiry is checked against timezone-aware UTC datetimes.
 
 Commit: `270a2cb feat: add redirect endpoint`
+
+### 5. Milestone 4 — link info and delete
+
+Added the lifecycle endpoints:
+
+- `app/services/link_service.py` now has `delete_link`, which deletes by slug and reports whether a row was removed.
+- `app/api/links.py` now has `GET /api/links/{slug}` and `DELETE /api/links/{slug}`.
+- Info returns the same response shape as create, with `404` for missing links and `410` for expired links.
+- Delete returns `204` with an empty body, or `404` when the slug does not exist.
+- Deleting an expired link is allowed and returns `204`.
+
+Commit: `fbf813f feat: add link info and delete endpoints`
 
 ## Verification Performed
 
@@ -216,13 +230,50 @@ Compilation check:
 
 Result: `COMPILE_OK`.
 
+### Milestone 4
+
+A temporary HTTP client script verified info and deletion against the running application.
+
+```text
+info: 200 slug=OtHBGtV
+unknown info: 404 Link not found
+expired info: 410 Link has expired
+delete: 204 empty body and row removed
+after delete: info and redirect return 404
+delete missing: 404
+delete expired: 204 and row removed
+```
+
+Server log confirmation:
+
+```text
+"GET /api/links/OtHBGtV HTTP/1.1" 200 OK
+"GET /api/links/does-not-exist HTTP/1.1" 404 Not Found
+"GET /api/links/expired-info-1795149992 HTTP/1.1" 410 Gone
+"DELETE /api/links/OtHBGtV HTTP/1.1" 204 No Content
+"GET /api/links/OtHBGtV HTTP/1.1" 404 Not Found
+"GET /OtHBGtV HTTP/1.1" 404 Not Found
+"DELETE /api/links/OtHBGtV HTTP/1.1" 404 Not Found
+"DELETE /api/links/expired-info-1795149992 HTTP/1.1" 204 No Content
+```
+
+The expired-link check inserted a row with `expires_at` in the past, confirmed `410` on info, then deleted it through the API and confirmed `204`. The temporary rows were removed afterward.
+
+Compilation check:
+
+```bash
+.venv/bin/python -m compileall -q app
+```
+
+Result: `COMPILE_OK`.
+
 ## Environment Notes
 
-- Native systemd services `postgresql@16-main` and `redis-server` were occupying `5432` and `6379`.
-- Those services were stopped, and the Docker Compose stack now owns `5432` and `6379`.
+- Native systemd services `postgresql@16-main` and `redis-server` are active again and occupy `5432` and `6379`.
+- The Docker Compose containers were started with a temporary override on `5433`/`6380` for Milestone 4 verification. The override lives in `/tmp/opencode/docker-compose.override.yml` and is not part of the repository.
 - The local `.env` points to the standard ports. `.env` is gitignored and is not committed.
+- To use the standard ports again, stop the native services (requires sudo) and run `docker compose up -d`.
 - `AGENTS.md` is currently deleted in the working tree. It was left untouched and is not part of the completed commits.
-- A temporary Compose override was used earlier for ports `5433`/`6380`; it is not part of the repository.
 
 ## How to Run the Current State
 
@@ -258,27 +309,48 @@ curl -i localhost:8000/<slug>
 
 Expected: `302` with `Location: <target_url>`.
 
+Get link info:
+
+```bash
+curl -i localhost:8000/api/links/<slug>
+```
+
+Expected: `200` with the same shape as the create response.
+
+Delete a link:
+
+```bash
+curl -i -X DELETE localhost:8000/api/links/<slug>
+```
+
+Expected: `204` with an empty body. A subsequent redirect or info request returns `404`.
+
 ## Next Milestone
 
-### Milestone 4 — link info and delete
+### Milestone 5 — Redis cache-aside and full health check
 
 Planned files:
 
-- Modify `app/services/link_service.py`
+- Create `app/core/redis.py`
+- Create `app/services/cache.py`
+- Modify `app/main.py`
+- Modify `app/api/redirect.py`
 - Modify `app/api/links.py`
+- Modify `app/api/health.py`
 
 Planned behavior:
 
-- `GET /api/links/{slug}` returns the same response shape as create.
-- Missing slug returns `404`; expired link returns `410`.
-- `DELETE /api/links/{slug}` removes the row and returns `204`.
-- Deleting a missing slug returns `404`.
+- Redirects check Redis first, then PostgreSQL on a miss, and populate the cache.
+- Cache TTL equals the link's remaining lifetime, capped by the default TTL.
+- Deleting a link invalidates `link:{slug}` in Redis.
+- Redis failures fall back to PostgreSQL and do not break redirects or deletes.
+- `/health` checks PostgreSQL and Redis independently, returning `503` when either fails.
 
 ## Pending Milestones
 
 - [x] Milestone 1 — scaffold and PostgreSQL health
 - [x] Milestone 2 — create endpoint
 - [x] Milestone 3 — redirect from PostgreSQL
-- [ ] Milestone 4 — link info and delete
+- [x] Milestone 4 — link info and delete
 - [ ] Milestone 5 — Redis cache-aside and full health check
 - [ ] Milestone 6 — README and final acceptance review
