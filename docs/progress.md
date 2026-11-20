@@ -8,7 +8,8 @@ Last updated: 2026-11-20
 - **Milestone 2 complete:** Base62 slug generation, request validation, custom aliases, collision retries, and `POST /api/links`.
 - **Milestone 3 complete:** `GET /{slug}` redirects from PostgreSQL with `302`, `404`, and `410` handling.
 - **Milestone 4 complete:** `GET /api/links/{slug}` returns metadata, and `DELETE /api/links/{slug}` removes links with `204` or `404`.
-- **Next:** Milestone 5 — Redis cache-aside, cache invalidation on delete, and full `/health`.
+- **Milestone 5 complete:** Redis cache-aside redirects, delete invalidation, TTLs, and a PostgreSQL + Redis `/health`.
+- **Next:** Milestone 6 — README and final acceptance review.
 
 Source of truth:
 
@@ -22,6 +23,7 @@ Source of truth:
 - `blog/02-creating-links.md` — Milestone 2 technical blog.
 - `blog/03-redirects.md` — Milestone 3 technical blog.
 - `blog/04-link-lifecycle.md` — Milestone 4 technical blog.
+- `blog/05-redis-cache-aside.md` — Milestone 5 technical blog.
 
 ## Completed Work
 
@@ -92,6 +94,19 @@ Added the lifecycle endpoints:
 
 Commit: `fbf813f feat: add link info and delete endpoints`
 
+### 6. Milestone 5 — Redis cache-aside and full health
+
+Added the cache layer:
+
+- `app/core/redis.py` creates the async Redis client and exposes the `get_redis` dependency from `app.state.redis`.
+- `app/services/cache.py` provides `cache_key`, `get_cached_target`, `set_cached_target`, and `delete_cached_target` with graceful failure handling.
+- `app/main.py` initializes Redis during lifespan and closes it on shutdown.
+- `app/api/redirect.py` checks Redis first, falls back to PostgreSQL on a miss, and populates the cache with a TTL based on the link lifetime.
+- `app/api/links.py` invalidates `link:{slug}` after a successful delete.
+- `app/api/health.py` checks PostgreSQL and Redis independently and returns `503` when either dependency is down.
+
+Commit: `46d00a2 feat: add redis cache-aside and full health check`
+
 ## Verification Performed
 
 ### Infrastructure and Milestone 1
@@ -135,7 +150,7 @@ HTTP/1.1 200 OK
 {"postgres":"ok"}
 ```
 
-Note: `/health` currently checks PostgreSQL only. The Redis check is added in Milestone 5.
+Note: this was the Milestone 1 behavior. `/health` now checks PostgreSQL and Redis independently.
 
 Schema:
 
@@ -267,10 +282,54 @@ Compilation check:
 
 Result: `COMPILE_OK`.
 
+### Milestone 5
+
+A temporary HTTP and Redis client script verified cache-aside behavior against the running application.
+
+```text
+health: 200 postgres=ok redis=ok
+cache populate: 302 and link:gJnAzjW ttl=86400
+cache hit: 302 after direct database deletion
+cache miss after eviction: 404
+delete invalidation: 204, cache cleared, redirect 404
+expiry ttl: key expired, redirect 410, ttl was 4
+redis down: redirect 302 via PostgreSQL; health 503
+redis restart: health 200; fallback link deleted
+```
+
+What each check proved:
+
+- The first redirect populated `link:{slug}` with the target URL and a TTL of `86400`.
+- The database row was deleted directly, then the second redirect still returned `302` from Redis. Removing the Redis key made the next request return `404`.
+- Deleting through the API returned `204`, removed the Redis key, and made the next redirect return `404`.
+- A link with a five-second lifetime cached with a four-second TTL. After six seconds the key was gone and the redirect returned `410`.
+- With the Redis container stopped, a redirect still returned `302` via PostgreSQL. `/health` returned `503` with `{"postgres":"ok","redis":"error"}`.
+- Restarting Redis restored `/health` to `200`.
+
+Server log confirmation included the expected fallback warnings:
+
+```text
+WARNING app.services.cache: Redis GET failed for link:DggQrjK; falling back to PostgreSQL
+WARNING app.services.cache: Redis SET failed for link:DggQrjK; continuing without cache
+WARNING app.api.health: Redis health check failed
+"GET /DggQrjK HTTP/1.1" 302 Found
+"GET /health HTTP/1.1" 503 Service Unavailable
+"GET /health HTTP/1.1" 200 OK
+```
+
+Compilation check:
+
+```bash
+.venv/bin/python -m compileall -q app
+```
+
+Result: `COMPILE_OK`.
+
 ## Environment Notes
 
 - Native systemd services `postgresql@16-main` and `redis-server` are active again and occupy `5432` and `6379`.
-- The Docker Compose containers were started with a temporary override on `5433`/`6380` for Milestone 4 verification. The override lives in `/tmp/opencode/docker-compose.override.yml` and is not part of the repository.
+- The Docker Compose containers were started with a temporary override on `5433`/`6380` for Milestones 4 and 5 verification. The override lives in `/tmp/opencode/docker-compose.override.yml` and is not part of the repository.
+- Milestone 5 verification stopped and restarted the Redis container to confirm that redirects degrade to PostgreSQL and `/health` reports `503`.
 - The local `.env` points to the standard ports. `.env` is gitignored and is not committed.
 - To use the standard ports again, stop the native services (requires sudo) and run `docker compose up -d`.
 - `AGENTS.md` is currently deleted in the working tree. It was left untouched and is not part of the completed commits.
@@ -283,13 +342,15 @@ docker compose up -d
 uvicorn app.main:app --reload
 ```
 
+If native services occupy `5432`/`6379`, stop them first or run against the temporary override with `DATABASE_URL=postgresql+asyncpg://shortener:shortener@localhost:5433/shortener` and `REDIS_URL=redis://localhost:6380/0`.
+
 Check health:
 
 ```bash
 curl -i localhost:8000/health
 ```
 
-Expected: `200 {"postgres":"ok"}`.
+Expected: `200 {"postgres":"ok","redis":"ok"}`.
 
 Create a link:
 
@@ -327,24 +388,18 @@ Expected: `204` with an empty body. A subsequent redirect or info request return
 
 ## Next Milestone
 
-### Milestone 5 — Redis cache-aside and full health check
+### Milestone 6 — README and final acceptance review
 
 Planned files:
 
-- Create `app/core/redis.py`
-- Create `app/services/cache.py`
-- Modify `app/main.py`
-- Modify `app/api/redirect.py`
-- Modify `app/api/links.py`
-- Modify `app/api/health.py`
+- Create `README.md`
+- Modify `docs/plan.md` (final status)
 
 Planned behavior:
 
-- Redirects check Redis first, then PostgreSQL on a miss, and populate the cache.
-- Cache TTL equals the link's remaining lifetime, capped by the default TTL.
-- Deleting a link invalidates `link:{slug}` in Redis.
-- Redis failures fall back to PostgreSQL and do not break redirects or deletes.
-- `/health` checks PostgreSQL and Redis independently, returning `503` when either fails.
+- Document setup, curl examples, and design decisions.
+- Run the full acceptance checklist from `SPEC.md`.
+- Confirm no out-of-scope features were added.
 
 ## Pending Milestones
 
@@ -352,5 +407,5 @@ Planned behavior:
 - [x] Milestone 2 — create endpoint
 - [x] Milestone 3 — redirect from PostgreSQL
 - [x] Milestone 4 — link info and delete
-- [ ] Milestone 5 — Redis cache-aside and full health check
+- [x] Milestone 5 — Redis cache-aside and full health check
 - [ ] Milestone 6 — README and final acceptance review
